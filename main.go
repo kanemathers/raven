@@ -28,7 +28,7 @@ func main() {
 
 	defer client.Disconnect()
 
-	client.LoadModules([]string{"core"})
+	client.LoadModules([]string{"core", "auth"})
 
 	if len(os.Args) >= 3 {
 		client.Subscribe("welcome", func(client *IRCClient, message *Message) {

@@ -20,16 +20,20 @@ func (core *Core) Init(client *IRCClient) error {
 	client.Subscribe("ping", core.pong)
 	client.Subscribe("nicknameinuse", core.changeNick)
 
-	client.Subscribe("!quit", core.quit)
-	client.Subscribe("!join", core.joinChannel)
-	client.Subscribe("!part", core.partChannel)
+	if module, ok := client.modules["auth"]; ok {
+		auth := module.(*Auth)
+
+		client.Subscribe("!quit", auth.RequireAuth(core.quit))
+		client.Subscribe("!join", auth.RequireAuth(core.joinChannel))
+		client.Subscribe("!part", auth.RequireAuth(core.partChannel))
+	}
 
 	return nil
 }
 
 func (core *Core) auth(client *IRCClient, message *Message) {
-	fmt.Fprintf(client.connection, "USER client 0 0 :client\r\n")
-	fmt.Fprintf(client.connection, "NICK client\r\n")
+	fmt.Fprintf(client.connection, "USER raven 0 0 :raven\r\n")
+	fmt.Fprintf(client.connection, "NICK raven\r\n")
 }
 
 func (core *Core) pong(client *IRCClient, message *Message) {

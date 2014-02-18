@@ -1,7 +1,7 @@
 package main
 
 type Module interface {
-	Init(*Raven) error
+	Init(*IRCClient) error
 }
 
 var (

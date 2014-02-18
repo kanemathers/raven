@@ -20,31 +20,31 @@ func main() {
 
 	log.Printf("Launching raven (version: %s)\n", version)
 
-	raven, err := NewRaven()
+	client, err := NewIRCClient()
 
 	if err != nil {
 		log.Fatalf("Failed to create IRC client: %s\n", err)
 	}
 
-	defer raven.Disconnect()
+	defer client.Disconnect()
 
-	raven.LoadModules([]string{"core"})
+	client.LoadModules([]string{"core"})
 
 	if len(os.Args) >= 3 {
-		raven.Subscribe("welcome", func(raven *Raven, message *Message) {
+		client.Subscribe("welcome", func(client *IRCClient, message *Message) {
 			for _, channel := range strings.Split(os.Args[2], ",") {
-				raven.Join(strings.TrimSpace(channel))
+				client.Join(strings.TrimSpace(channel))
 			}
 		})
 	}
 
-	if err := raven.Connect(os.Args[1]); err == nil {
+	if err := client.Connect(os.Args[1]); err == nil {
 		log.Printf("Connected to %s\n", os.Args[1])
 	} else {
 		log.Fatalf("Failed to connect to %s\n", os.Args[1])
 	}
 
-	raven.Fly()
+	client.Run()
 
 	log.Printf("Shutting down")
 }

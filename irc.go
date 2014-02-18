@@ -19,9 +19,9 @@ var (
 	}
 )
 
-type Handler func(*Raven, *Message)
+type Handler func(*IRCClient, *Message)
 
-type Raven struct {
+type IRCClient struct {
 	connection net.Conn
 	db         *sql.DB
 	modules    map[string]Module
@@ -35,28 +35,28 @@ type Message struct {
 	args    []string
 }
 
-func NewRaven() (*Raven, error) {
-	raven := &Raven{
+func NewIRCClient() (*IRCClient, error) {
+	client := &IRCClient{
 		modules:  make(map[string]Module),
 		handlers: make(map[string][]Handler),
 	}
 
-	if db, err := sql.Open("sqlite3", "/tmp/raven.db"); err == nil {
-		raven.db = db
+	if db, err := sql.Open("sqlite3", "/tmp/client.db"); err == nil {
+		client.db = db
 	} else {
 		return nil, err
 	}
 
-	return raven, nil
+	return client, nil
 }
 
-func (raven *Raven) LoadModule(name string) error {
+func (client *IRCClient) LoadModule(name string) error {
 	if module := LoadModule(name); module != nil {
 		log.Printf("Loading module: %s\n", name)
 
-		raven.modules[name] = module
+		client.modules[name] = module
 
-		if err := module.Init(raven); err != nil {
+		if err := module.Init(client); err != nil {
 			log.Printf("Failed to load module: %s\n", name)
 		}
 	} else {
@@ -66,32 +66,32 @@ func (raven *Raven) LoadModule(name string) error {
 	return nil
 }
 
-func (raven *Raven) LoadModules(modules []string) error {
+func (client *IRCClient) LoadModules(modules []string) error {
 	for _, module := range modules {
-		raven.LoadModule(module)
+		client.LoadModule(module)
 	}
 
 	return nil
 }
 
-func (raven *Raven) Connect(server string) error {
+func (client *IRCClient) Connect(server string) error {
 	if connection, err := net.Dial("tcp", server); err == nil {
-		raven.connection = connection
+		client.connection = connection
 	} else {
 		return err
 	}
 
-	raven.Dispatch("connected", nil)
+	client.Dispatch("connected", nil)
 
 	return nil
 }
 
-func (raven *Raven) Disconnect() {
-	raven.connection.Close()
+func (client *IRCClient) Disconnect() {
+	client.connection.Close()
 }
 
-func (raven *Raven) Fly() error {
-	reader := bufio.NewReader(raven.connection)
+func (client *IRCClient) Run() error {
+	reader := bufio.NewReader(client.connection)
 
 	for {
 		line, err := reader.ReadString('\r')
@@ -109,12 +109,12 @@ func (raven *Raven) Fly() error {
 			args:    args,
 		}
 
-		raven.Dispatch("*", &message)
+		client.Dispatch("*", &message)
 
 		if event, ok := ircEvents[command]; ok {
-			raven.Dispatch(event, &message)
+			client.Dispatch(event, &message)
 		} else {
-			raven.Dispatch(strings.ToLower(command), &message)
+			client.Dispatch(strings.ToLower(command), &message)
 		}
 
 		if len(args) >= 2 && args[1][0] == '!' {
@@ -126,7 +126,7 @@ func (raven *Raven) Fly() error {
 				message.args[1] = ""
 			}
 
-			raven.Dispatch(s[0], &message)
+			client.Dispatch(s[0], &message)
 		}
 
 		//fmt.Printf("%+v\n", message)
@@ -135,17 +135,17 @@ func (raven *Raven) Fly() error {
 	return nil
 }
 
-func (raven *Raven) Dispatch(event string, message *Message) {
-	for _, handler := range raven.handlers[event] {
-		handler(raven, message)
+func (client *IRCClient) Dispatch(event string, message *Message) {
+	for _, handler := range client.handlers[event] {
+		handler(client, message)
 	}
 }
 
-func (raven *Raven) Subscribe(event string, fn Handler) {
-	raven.handlers[event] = append(raven.handlers[event], fn)
+func (client *IRCClient) Subscribe(event string, fn Handler) {
+	client.handlers[event] = append(client.handlers[event], fn)
 }
 
-func (raven *Raven) Join(channel string) {
+func (client *IRCClient) Join(channel string) {
 	var buffer bytes.Buffer
 
 	if channel[0] != '#' {
@@ -157,10 +157,10 @@ func (raven *Raven) Join(channel string) {
 	channel = buffer.String()
 
 	log.Printf("Joining channel: %s\n", channel)
-	fmt.Fprintf(raven.connection, "JOIN %s\r\n", channel)
+	fmt.Fprintf(client.connection, "JOIN %s\r\n", channel)
 }
 
-func (raven *Raven) Part(channel string) {
+func (client *IRCClient) Part(channel string) {
 	var buffer bytes.Buffer
 
 	if channel[0] != '#' {
@@ -172,7 +172,7 @@ func (raven *Raven) Part(channel string) {
 	channel = buffer.String()
 
 	log.Printf("Parting channel: %s\n", channel)
-	fmt.Fprintf(raven.connection, "PART %s\r\n", channel)
+	fmt.Fprintf(client.connection, "PART %s\r\n", channel)
 }
 
 func parseLine(line string) (prefix string, command string, args []string) {
